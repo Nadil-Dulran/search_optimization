@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Assignment Summary Report</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  body { font-family: "Segoe UI", Roboto, Arial, sans-serif; background: #f9fafb; margin: 0; padding: 0; }
+  .page { max-width: 1150px; margin: 20px auto; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+  h1 { text-align: center; margin-bottom: 1rem; }
+  h2 { margin-top: 2rem; border-left: 6px solid #0ea5e9; padding-left: 10px; }
+  h3 { margin-top: 1rem; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+  th { background: #f3f4f6; }
+  .ok { color: green; font-weight: bold; }
+  .no { color: red; font-weight: bold; }
+  .section { margin-bottom: 3rem; }
+  .desc { color: #444; margin-bottom: 0.5rem; }
+  canvas, svg { border: 1px solid #ccc; margin-top: 10px; }
+  .score { font-weight: bold; margin-top: 0.5rem; }
+  textarea { width: 100%; height: 90px; margin-top: 0.5rem; font-family: inherit; font-size: 14px; padding: 6px; border-radius: 6px; border: 1px solid #ccc; }
+  .grid-wrap { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; }
+  .kv { font-size: 14px; color: #555; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="page">
+  <h1>Optimization & Search — Assignment Summary</h1>
+
+  <h2>Overall Summary</h2>
+  <table id="summary-table">
+    <thead>
+      <tr><th>Task</th><th>Status</th><th>Score</th><th>Details</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div id="sections"></div>
+</div>
+
+<script>
+// ------------- Helpers -------------
+function addSummaryRow(tbl, name, score, maxScore, ok, details) {
+  const tr = document.createElement("tr");
+  const td1 = document.createElement("td"); td1.textContent = name;
+  const td2 = document.createElement("td"); td2.innerHTML = ok ? "<span class='ok'>OK</span>" : "<span class='no'>No</span>";
+  const td3 = document.createElement("td"); td3.textContent = score + "/" + maxScore;
+  const td4 = document.createElement("td"); td4.textContent = details;
+  tr.append(td1, td2, td3, td4);
+  tbl.appendChild(tr);
+}
+
+function drawGrid(canvas, rows, cols, obstacles, path, start, goal) {
+  const ctx = canvas.getContext("2d");
+  const cellSize = Math.floor(canvas.width / cols);
+  canvas.height = cellSize * rows;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  // grid
+  ctx.strokeStyle = "#ddd";
+  for (let r=0;r<rows;r++) for (let c=0;c<cols;c++) ctx.strokeRect(c*cellSize,r*cellSize,cellSize,cellSize);
+  // obstacles
+  ctx.fillStyle = "#333";
+  (obstacles||[]).forEach(([r,c])=>ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize));
+  // start/goal
+  if (start){ ctx.fillStyle="#22c55e"; ctx.fillRect(start[1]*cellSize,start[0]*cellSize,cellSize,cellSize); }
+  if (goal){ ctx.fillStyle="#ef4444"; ctx.fillRect(goal[1]*cellSize,goal[0]*cellSize,cellSize,cellSize); }
+  // path
+  if (path && path.length>0) {
+    ctx.strokeStyle = "#0ea5e9"; ctx.lineWidth = 3; ctx.beginPath();
+    path.forEach(([r,c],i)=>{
+      const x = c*cellSize+cellSize/2, y = r*cellSize+cellSize/2;
+      if (i==0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  }
+}
+
+function drawHistory(canvas, history) {
+  if (!history) return;
+  new Chart(canvas, {
+    type: 'line',
+    data: { labels: history.map((_,i)=>i), datasets: [{label:"Best cost", data: history, borderColor:"blue", fill:false}] },
+    options: { scales: { x:{title:{display:true,text:"Iteration"}}, y:{title:{display:true,text:"Cost"}} } }
+  });
+}
+
+function drawLP(canvas, vertices, optimum) {
+  const ctx = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const scale = 40, pad = 20;
+  // axes
+  ctx.strokeStyle="#bbb"; ctx.beginPath();
+  ctx.moveTo(pad,H-pad); ctx.lineTo(W-pad,H-pad); ctx.moveTo(pad,H-pad); ctx.lineTo(pad,pad); ctx.stroke();
+  // polygon
+  if (vertices && vertices.length>=3) {
+    ctx.fillStyle = "rgba(14,165,233,0.25)";
+    ctx.beginPath();
+    vertices.forEach(([x,y],i)=>{
+      const px = pad + x*scale, py = H - (pad + y*scale);
+      if (i==0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    });
+    ctx.closePath(); ctx.fill();
+  }
+  // vertices points
+  ctx.fillStyle="#0ea5e9";
+  (vertices||[]).forEach(([x,y])=>{
+    const px = pad + x*scale, py = H - (pad + y*scale);
+    ctx.beginPath(); ctx.arc(px,py,3,0,2*Math.PI); ctx.fill();
+  });
+  // optimum
+  if (optimum) {
+    const [x,y] = optimum;
+    const px = pad + x*scale, py = H - (pad + y*scale);
+    ctx.fillStyle="#ef4444"; ctx.beginPath(); ctx.arc(px,py,5,0,2*Math.PI); ctx.fill();
+  }
+}
+
+function drawDP(div, table) {
+  if (!table) return;
+  const t = document.createElement("table");
+  (table||[]).forEach(row=>{
+    const tr = document.createElement("tr");
+    row.forEach(cell=>{ const td=document.createElement("td"); td.textContent=cell; tr.appendChild(td); });
+    t.appendChild(tr);
+  });
+  div.appendChild(t);
+}
+
+function addJustification(sec, key) {
+  const label = document.createElement("p");
+  label.textContent = "Justification / Design Notes (saved locally):";
+  const ta = document.createElement("textarea");
+  ta.value = localStorage.getItem("notes_"+key) || "";
+  ta.addEventListener("input", ()=>localStorage.setItem("notes_"+key, ta.value));
+  sec.append(label, ta);
+}
+
+function addKV(sec, obj) {
+  const p = document.createElement("p"); p.className="kv";
+  p.textContent = Object.entries(obj).map(([k,v])=>`${k}: ${v}`).join("  •  ");
+  sec.appendChild(p);
+}
+
+function addSection(container, name, desc, data, renderFn, key) {
+  const sec = document.createElement("div");
+  sec.className="section";
+  const h2 = document.createElement("h2"); h2.textContent=name;
+  const p = document.createElement("p"); p.className="desc"; p.textContent=desc;
+  sec.append(h2,p);
+  if (renderFn) renderFn(sec,data);
+  const score = document.createElement("p"); score.className="score"; score.textContent = "Score: "+(data?.score||0);
+  sec.append(score);
+  addJustification(sec,key);
+  container.appendChild(sec);
+}
+
+// ------------- Main -------------
+Promise.all([
+  fetch("results.json",{cache:"no-store"}).then(r=>r.json()),
+  fetch("problem.json",{cache:"no-store"}).then(r=>r.json()).catch(_=>null)
+]).then(([d,prob])=>{
+  const tbl = document.querySelector("#summary-table tbody");
+  const sec = document.querySelector("#sections");
+
+  const rows = d.rows, cols = d.cols, obstacles = d.obstacles, start = d.start, goal = d.goal;
+
+  // Summary (✓ only if full marks)
+  addSummaryRow(tbl,"BFS (10%)", d.bfs?.score||0,10, d.bfs?.score==10, `Path len ${d.bfs?.path_len}/${d.bfs?.best_len}`);
+  addSummaryRow(tbl,"A* (15%)", d.astar?.score||0,15, d.astar?.score==15, `Expansions ${d.astar?.expansions}`);
+  addSummaryRow(tbl,"IDS (15%)", d.ids?.score||0,15, d.ids?.score==15, `Expansions ${d.ids?.expansions}`);
+  addSummaryRow(tbl,"Simulated Annealing (15%)", d.sa?.score||0,15, d.sa?.score==15, `Improvement ${ (d.sa?.improvement||0).toFixed(2) }`);
+  addSummaryRow(tbl,"Heuristics (20%)", d.heuristics?.score||0,20, d.heuristics?.score==20,
+                `M:${d.heuristics?.manhattan?.ok?'✓':'✗'} E:${d.heuristics?.straight?.ok?'✓':'✗'} C:${d.heuristics?.custom?.ok?'✓':'✗'}`);
+  addSummaryRow(tbl,"Linear Programming (12.5%)", d.lp?.score||0,12.5, d.lp?.score==12.5, `Z* ${d.lp?.optimum}`);
+  addSummaryRow(tbl,"Dynamic Programming (12.5%)", d.dp?.score||0,12.5, d.dp?.score==12.5, `Value ${d.dp?.optimum}`);
+
+  // BFS
+  addSection(sec,"Breadth-First Search (10%)",
+    "BFS must find the shortest unweighted path from start to goal.",
+    d.bfs,(s,data)=>{
+      addKV(s, {Seed:d.seed, Grid:`${rows}x${cols}`, Obstacles:(obstacles?.length||0)});
+      const wrap = document.createElement("div"); wrap.className="grid-wrap";
+      const canv=document.createElement("canvas"); canv.width=320; canv.height=320; wrap.appendChild(canv);
+      drawGrid(canv, rows, cols, obstacles, data.path, start, goal);
+      s.appendChild(wrap);
+    },"bfs");
+
+  // A*
+  addSection(sec,"A* Search (15%)",
+    "A* should find an optimal path using an admissible heuristic (we grade with Manhattan).",
+    d.astar,(s,data)=>{
+      addKV(s, {Expansions:data.expansions, PathLen:data.path_len, BestLen:data.best_len});
+      const canv=document.createElement("canvas"); canv.width=320; canv.height=320; s.appendChild(canv);
+      drawGrid(canv, rows, cols, obstacles, data.path, start, goal);
+    },"astar");
+
+  // IDS
+  addSection(sec,"Iterative Deepening Search (15%)",
+    "IDS combines DFS space with BFS completeness; should reach the goal and match shortest depth on unweighted grid.",
+    d.ids,(s,data)=>{
+      addKV(s, {Expansions:data.expansions, PathLen:data.path_len, BestLen:data.best_len});
+      const canv=document.createElement("canvas"); canv.width=320; canv.height=320; s.appendChild(canv);
+      drawGrid(canv, rows, cols, obstacles, data.path, start, goal);
+    },"ids");
+
+  // SA
+  addSection(sec,"Simulated Annealing (15%)",
+    "SA must improve on the BFS baseline and exhibit an annealing history (non-constant, multiple changes).",
+    d.sa,(s,data)=>{
+      addKV(s, {BFS_Cost:data.bfs0_cost, Final_Cost:data.final_cost, Improvement:(data.improvement||0).toFixed(2)});
+      const wrap = document.createElement("div"); wrap.className="grid-wrap";
+      const canv=document.createElement("canvas"); canv.width=320; canv.height=320; wrap.appendChild(canv);
+      drawGrid(canv, rows, cols, obstacles, data.path, start, goal);
+      const histCanvas=document.createElement("canvas"); histCanvas.width=420; histCanvas.height=220; wrap.appendChild(histCanvas);
+      drawHistory(histCanvas, data.history);
+      s.appendChild(wrap);
+    },"sa");
+
+  // Heuristics
+  addSection(sec,"Heuristics (20%)",
+    "We test heuristics on random states for admissibility & sanity: Manhattan (5), Straight-line (5), Custom (10).",
+    d.heuristics,(s,data)=>{
+      const t = document.createElement("table");
+      t.innerHTML = `<tr><th>Heuristic</th><th>Status</th><th>Score</th><th>Detail</th></tr>`;
+      [["Manhattan","manhattan"],["Straight-line","straight"],["Custom","custom"]].forEach(([name,key])=>{
+        const r = document.createElement("tr");
+        const st = data?.[key]?.ok ? "<span class='ok'>OK</span>" : "<span class='no'>Fail</span>";
+        r.innerHTML = `<td>${name}</td><td>${st}</td><td>${data?.[key]?.score||0}</td><td>${data?.[key]?.detail||""}</td>`;
+        t.appendChild(r);
+      });
+      s.appendChild(t);
+    },"heuristics");
+
+  // LP
+  addSection(sec,"Linear Programming (12.5%)",
+    "Graphical corner-point method on a small LP. The optimum must be at a feasible vertex.",
+    d.lp,(s,data)=>{
+      const eq = document.createElement("div"); eq.className="kv";
+      eq.textContent = `Maximize Z = ${data.c[0]}*x + ${data.c[1]}*y  subject to Ax ≤ b, x≥0,y≥0`;
+      s.appendChild(eq);
+      const canv=document.createElement("canvas"); canv.width=360; canv.height=320; s.appendChild(canv);
+      drawLP(canv, data.vertices, data.best_point);
+    },"lp");
+
+  // DP
+  addSection(sec,"Dynamic Programming – Knapsack (12.5%)",
+    "0/1 Knapsack solved via bottom-up & top-down; both should agree on the optimal value.",
+    d.dp,(s,data)=>{
+      addKV(s, {Capacity:data.capacity, Items:data.values?.length||0,
+                BottomUp:data.bottom_up_value, TopDown:data.top_down_value});
+      const div=document.createElement("div"); s.appendChild(div);
+      drawDP(div, data.table);
+    },"dp");
+
+  // Hidden Integrity Checks
+  const integrity = document.createElement("div"); integrity.className="section";
+  const h2 = document.createElement("h2"); h2.textContent="Hidden Integrity Checks";
+  integrity.appendChild(h2);
+  const t = document.createElement("table");
+  const head = document.createElement("tr");
+  ["Check","Status","Details"].forEach(txt=>{ const th=document.createElement("th"); th.textContent=txt; head.appendChild(th); });
+  t.appendChild(head);
+  (d.hidden_checks||[]).forEach(ch=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML = `<td>${ch.name}</td><td>${ch.ok?'<span class="ok">OK</span>':'<span class="no">Fail</span>'}</td><td>${ch.detail||''}</td>`;
+    t.appendChild(tr);
+  });
+  integrity.appendChild(t);
+  sec.appendChild(integrity);
+});
+</script>
+</body>
+</html>
