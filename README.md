@@ -8,8 +8,7 @@ The runner generates `problem.json` and `results.json`. The `index.html` page lo
 
 ## Folder layout
 
-```
-Assignment_/
+search_optimization_/
 ├── index.html
 ├── runner.py
 ├── heuristics.py
@@ -21,7 +20,6 @@ Assignment_/
 └── (generated at runtime)
     ├── problem.json
     └── results.json
-```
 
 ---
 
@@ -37,9 +35,9 @@ Assignment_/
 
 ## Quick Start — macOS (zsh)
 
-```bash
+IN bash:
 # 1) Go to the assignment folder
-cd /path/to/Assignment_IT23161788
+cd /path/to/search_optimization
 
 # 2) Create & activate a virtual environment
 python3 -m venv .venv
@@ -49,7 +47,7 @@ source .venv/bin/activate
 pip install numpy matplotlib
 
 # 4) Generate results (you can change seed/rows/cols/density)
-python3 runner.py --student_id IT23161788 --seed 42 --rows 6 --cols 6 --density 0.22
+python3 runner.py --student_id YOURID --seed 42 --rows 6 --cols 6 --density 0.22
 
 # 5) Start a local web server from this exact folder
 python3 -m http.server 8000
@@ -58,15 +56,13 @@ python3 -m http.server 8000
 # (copy/paste in your browser)
 http://localhost:8000/index.html
 
-```
-
 ---
 
 ## Quick Start — Windows (PowerShell)
 
-```powershell
+IN powershell:
 # 1) Go to the assignment folder
-cd C:\path\to\Assignment_IT23161788
+cd C:\path\to\search_optimization
 
 # 2) Create & activate a virtual environment
 py -3 -m venv .venv
@@ -76,15 +72,13 @@ py -3 -m venv .venv
 pip install numpy matplotlib
 
 # 4) Generate results
-py -3 .\runner.py --student_id IT23161788 --seed 42 --rows 6 --cols 6 --density 0.22
+py -3 .\runner.py --student_id YOURID --seed 42 --rows 6 --cols 6 --density 0.22
 
 # 5) Start a local web server
 py -3 -m http.server 8000
 
 # 6) Open the summary page in your browser
 http://localhost:8000/index.html
-
-```
 
 ---
 
@@ -94,23 +88,20 @@ http://localhost:8000/index.html
   - Use the **same URL/port** (e.g., `http://localhost:8000`) when you come back, or the notes won’t appear.
 - If you only see the **table header** and no content, make sure you’re serving via `http://` (not `file://`) and that `problem.json` and `results.json` exist in the same folder as `index.html`.
 - You can tweak the problem via CLI flags:
-  ```
   --seed <int>  --rows <int>  --cols <int>  --density <0..1>  --weighted
-  ```
+---
 
 ### Debug prints
 
 BFS/A*/IDS can print debug info if you enable the flag:
 
 - **macOS/Linux:**
-  ```bash
-  ASSIGN_DEBUG=1 python3 runner.py --student_id IT23161788
-  ```
+  In bash:
+  ASSIGN_DEBUG=1 python3 runner.py --student_id YOURID
 
 - **Windows PowerShell:**
-  ```powershell
-  $env:ASSIGN_DEBUG=1; py -3 runner.py --student_id IT23161788
-  ```
+  In powershell:
+  $env:ASSIGN_DEBUG=1; py -3 runner.py --student_id YOURID
 
 ---
 
@@ -128,11 +119,11 @@ Regenerate and hard-reload:
 ```bash
 # macOS/Linux
 rm -f problem.json results.json
-python3 runner.py --student_id IT23161788 --seed 42
+python3 runner.py --student_id YOURID --seed 42
 
 # Windows (PowerShell)
 Remove-Item problem.json, results.json -ErrorAction SilentlyContinue
-py -3 runner.py --student_id IT23161788 --seed 42
+py -3 runner.py --student_id YOURID --seed 42
 ```
 Open `http://localhost:8000/index.html?ts=1` and hard refresh (**Cmd/Ctrl+Shift+R**). In DevTools, tick **Disable cache**.
 
