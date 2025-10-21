@@ -8,6 +8,7 @@ The runner generates `problem.json` and `results.json`. The `index.html` page lo
 
 ## Folder layout
 
+```
 search_optimization_/
 ├── index.html
 ├── runner.py
@@ -20,6 +21,7 @@ search_optimization_/
 └── (generated at runtime)
     ├── problem.json
     └── results.json
+```
 
 ---
 
@@ -35,7 +37,7 @@ search_optimization_/
 
 ## Quick Start — macOS (zsh)
 
-IN bash:
+```bash
 # 1) Go to the assignment folder
 cd /path/to/search_optimization
 
@@ -56,11 +58,13 @@ python3 -m http.server 8000
 # (copy/paste in your browser)
 http://localhost:8000/index.html
 
+```
+
 ---
 
 ## Quick Start — Windows (PowerShell)
 
-IN powershell:
+```powershell
 # 1) Go to the assignment folder
 cd C:\path\to\search_optimization
 
@@ -80,6 +84,8 @@ py -3 -m http.server 8000
 # 6) Open the summary page in your browser
 http://localhost:8000/index.html
 
+```
+
 ---
 
 ## Tips & Notes
@@ -88,20 +94,23 @@ http://localhost:8000/index.html
   - Use the **same URL/port** (e.g., `http://localhost:8000`) when you come back, or the notes won’t appear.
 - If you only see the **table header** and no content, make sure you’re serving via `http://` (not `file://`) and that `problem.json` and `results.json` exist in the same folder as `index.html`.
 - You can tweak the problem via CLI flags:
+  ```
   --seed <int>  --rows <int>  --cols <int>  --density <0..1>  --weighted
----
+  ```
 
 ### Debug prints
 
 BFS/A*/IDS can print debug info if you enable the flag:
 
 - **macOS/Linux:**
-  In bash:
+  ```bash
   ASSIGN_DEBUG=1 python3 runner.py --student_id YOURID
+  ```
 
 - **Windows PowerShell:**
-  In powershell:
+  ```powershell
   $env:ASSIGN_DEBUG=1; py -3 runner.py --student_id YOURID
+  ```
 
 ---
 
